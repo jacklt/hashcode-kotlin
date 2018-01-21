@@ -1,12 +1,15 @@
 package com.cose
 
 import java.io.File
+import kotlin.system.measureTimeMillis
 
 fun main(args: Array<String>) {
-    val fn = listOf("example", "small", "medium", "big")
-    fn.take(1).forEach {
-        App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out"))
-    }
+    measureTimeMillis {
+        val fn = listOf("example", "small", "medium", "big")
+        fn.forEach {
+            App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out"))
+        }
+    }.also { println("Completed in ${it}ms") }
 }
 
 data class Problem(
@@ -23,7 +26,7 @@ data class Solution(val slices: List<Slice>)
 object App {
     fun solveForX(inputFile: File, outputFile: File) {
         val problem = parse(inputFile)
-        println("Problem: $problem")
+        // println("Problem: $problem")
 
         // do some stuff
 
@@ -32,7 +35,8 @@ object App {
                 Slice(0 to 2, 2 to 2),
                 Slice(0 to 3, 2 to 4)
         ))
-        println("Solution: $solution")
-        write(outputFile, solution)
+
+        // println("Solution: $solution")
+        // write(outputFile, solution)
     }
 }
