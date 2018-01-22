@@ -19,4 +19,4 @@ fun parse(inputFile: File) = with(Parser(inputFile)) {
 }
 
 fun write(outputFile: File, solution: Solution) = outputFile.writeText("""${solution.slices.size}
-${solution.slices.map { "${it.p1.first} ${it.p1.second} ${it.p2.first} ${it.p2.second}" }.joinToString("\n")}""")
+${solution.slices.map { "${it.x1} ${it.y1} ${it.x2} ${it.y2}" }.joinToString("\n")}""")
