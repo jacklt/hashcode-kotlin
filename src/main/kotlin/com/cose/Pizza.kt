@@ -1,12 +1,16 @@
 package com.cose
 
 import java.io.File
+import kotlin.math.ceil
 import kotlin.system.measureTimeMillis
+
+const val DEBUG = false
+const val VISUALIZE = false
 
 fun main(args: Array<String>) {
     measureTimeMillis {
         val fn = listOf("example", "small", "medium", "big")
-        fn.take(4).forEach {
+        fn.slice(0..3).forEach {
             App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out"))
         }
     }.also { println("Completed in ${it}ms") }
@@ -25,114 +29,189 @@ data class Problem(
     val tomatoCount = flatSize - mashroomCount
 }
 
-data class Slice(val x1: Int, val y1: Int, val x2: Int, val y2: Int, val mashCount: Int, val tomatoCount: Int)
+data class Slice(var x1: Int, var y1: Int, var x2: Int, var y2: Int, val mashCount: Int, val tomatoCount: Int)
 data class Solution(val slices: List<Slice>)
 
 object App {
     fun solveForX(inputFile: File, outputFile: File) {
         val problem = parse(inputFile)
 
-        val slicePair = with(problem) {
-            val minSize = minIng * 2
-            (1..maxSliceSize).flatMap { row ->
-                (1..maxSliceSize).mapNotNull { col ->
-                    val size = row * col
-                    if (size in (minSize..maxSliceSize)) {
-                        (row to col)
-                    } else null
-                }
-            }
-        }.sortedBy { it.first * it.second }.also { println("STATS: slicePair: $it") }
+        val slicePair = problem.findSlicePair()
+        println("slicePair: $slicePair")
 
-        // Completed in 151ms
-
-
-        val validSlice = with(problem) {
-            mashrooms.mapIndexed { x, row ->
-                row.mapIndexed { y, item ->
-                    slicePair.mapNotNull { (nRow, nCol) ->
-                        val endX = x + nRow - 1
-                        val endY = y + nCol - 1
-                        if (endX < mashrooms.size && endY < row.size) {
-                            val sliceIngredients = mashrooms.slice(x..endX).flatMap {
-                                it.slice(y..endY)
-                            }
-                            val mashCount = sliceIngredients.count { it }
-                            val tomatoCount = sliceIngredients.size - mashCount
-                            if (mashCount >= minIng && (tomatoCount >= minIng)) {
-                                Slice(x, y, endX, endY, mashCount, tomatoCount)
-                            } else null
-                        } else null
-                    }
-                }
-            }
-        } // .also { println("STATS: validSlice: $it") }
-
-        // Completed in 5824ms
+        val validSlice = problem.filterValidSlice(slicePair)
+        if (DEBUG) println("validSlice: $validSlice")
 
         val flatValidSlice = validSlice.flatMap { it }.flatMap { it }
-        println("STATS: ${flatValidSlice.size} valid slice")
+        println("validSlice count: ${flatValidSlice.size}")
 
-        // println("\nslice:\n" + validSlice.map { it.map { it.size }.joinToString("") }.joinToString("\n"))
+        val validSliceX1Y2 = flatValidSlice.groupBy { it.x1 }.map {
+            it.value.groupBy { it.y2 }.map {
+                it.value.sortedBy { it.mashCount + it.tomatoCount }
+            }.sortedByDescending { it[0].y2 }
+        }.sortedBy { it[0][0].x1 }
+        val validSliceX2Y1 = flatValidSlice.groupBy { it.x2 }.map {
+            it.value.groupBy { it.y1 }.map {
+                it.value.sortedBy { it.mashCount + it.tomatoCount }
+            }.sortedBy { it[0].y1 }
+        }.sortedByDescending { it[0][0].x2 }
+        val validSliceX2Y2 = flatValidSlice.groupBy { it.x2 }.map {
+            it.value.groupBy { it.y2 }.map {
+                it.value.sortedBy { it.mashCount + it.tomatoCount }
+            }.sortedByDescending { it[0].y2 }
+        }.sortedByDescending { it[0][0].x2 }
 
-//        val hitMap = problem.mashrooms.map { it.map { 0 }.toMutableList() }
-//        flatValidSlice.forEach {
-//            (it.x1 until it.x2).forEach { i ->
-//                (it.y1 until it.y2).forEach { j ->
-//                    hitMap[i][j] += 1
-//                }
-//            }
-//        }
-//        println("\nhit:\n" + hitMap.map { it.joinToString(" ") }.joinToString("\n"))
+        val (availableMap, bestSlices) = listOf(validSlice, validSliceX1Y2, validSliceX2Y1, validSliceX2Y2).flatMap { slices ->
+            listOf(1.0, 1.1, 2.0).map {
+                problem.solve(slices, it) // .apply { println("$it -> ${first.calcPoints()}") }
+            }
+        }.maxBy { (availableMap, _) ->
+                    availableMap.calcPoints()
+                }!!
 
-       // println("\nvisualize:\n" + problem.mashrooms.map { it.map { if (it) 'x' else 'o' }.joinToString(" ") }.joinToString("\n"))
+        problem.visualize(bestSlices)
 
-        var pizzaAvailable = problem.flatSize
-        var mashAvailable = problem.mashroomCount
-        var tomatoAvailable = problem.tomatoCount
-        val availableMap = problem.mashrooms.map { it.map { false }.toMutableList() }
+        println("Solution! slice count: ${bestSlices.size}")
+
+        val points = availableMap.calcPoints()
+        println("Points: $points / ${problem.flatSize} = ${points / problem.flatSize.toDouble() * 100}%\n")
+
+        write(outputFile, Solution(bestSlices))
+    }
+
+    private fun List<MutableList<Boolean>>.calcPoints() = map { it.count { !it } }.sum()
+
+    private fun Problem.solve(validSlice: List<List<List<Slice>>>, magicNumber: Double): Pair<List<MutableList<Boolean>>, MutableList<Slice>> {
+        var pizzaAvailable = flatSize.toDouble()
+        var mashAvailable = mashroomCount.toDouble()
+        var tomatoAvailable = tomatoCount.toDouble()
+        val availableMap = mashrooms.map { it.map { true }.toMutableList() }
         val bestSlices = mutableListOf<Slice>()
+
         validSlice.forEachIndexed { x, row ->
-            val maxSliceLeft = pizzaAvailable / problem.maxSliceSize.toDouble() / problem.minIng
-            val maxMash = Math.max(problem.minIng.toDouble(), mashAvailable / maxSliceLeft)
+            val maxSliceLeft = ceil(pizzaAvailable / maxSliceSize.toDouble()) // problem.minIng
+            val maxMash = minIng + ceil((mashAvailable - maxSliceLeft * minIng) / maxSliceLeft * magicNumber)
+            val maxTomato = minIng + ceil((tomatoAvailable - maxSliceLeft * minIng) / maxSliceLeft * magicNumber)
             row.forEachIndexed { y, slices ->
                 slices.lastOrNull { slice ->
-                    slice.mashCount <= maxMash && availableMap.slice(slice.x1..slice.x2).flatMap {
+                    slice.mashCount <= maxMash && slice.tomatoCount <= maxTomato && availableMap.slice(slice.x1..slice.x2).flatMap {
                         it.slice(slice.y1..slice.y2)
-                    }.all { !it }.also {
-                        if (it) {
-                            (slice.x1..slice.x2).forEach { x ->
-                                (slice.y1..slice.y2).forEach { y ->
-                                    availableMap[x][y] = true
+                    }.all { it }
+                }?.also {
+                            // println("$pizzaAvailable $maxSliceLeft ($mashAvailable ${it.mashCount} $maxMash) ($tomatoAvailable $tomatoAvailable $maxTomato)")
+                            (it.x1..it.x2).forEach { x ->
+                                (it.y1..it.y2).forEach { y ->
+                                    availableMap[x][y] = false
                                 }
                             }
-                        }
-                    }
-                }?.also {
+                            pizzaAvailable -= it.mashCount + it.tomatoCount
+                            mashAvailable -= it.mashCount
+                            tomatoAvailable -= it.tomatoCount
                             bestSlices.add(it)
                         }
             }
         }
 
-        println("STATS: Found: ${bestSlices.size}")
+        // try expand
+        bestSlices.forEach { slice ->
+            while (expandTop(slice, availableMap)) {
+            }
+            while (expandBottom(slice, availableMap)) {
+            }
+            while (expandLeft(slice, availableMap)) {
+            }
+            while (expandRight(slice, availableMap)) {
+            }
+        }
+        return Pair(availableMap, bestSlices)
+    }
 
-        val points = availableMap.map { it.count { it } }.sum()
-        println("STATS: Points: $points / ${problem.flatSize} = ${points / problem.flatSize.toDouble() * 100}%\n")
+    private fun Problem.expandTop(slice: Slice, availableMap: List<MutableList<Boolean>>): Boolean {
+        var expanded = false
+        val prevRow = slice.x1 - 1
+        if (prevRow >= 0) {
+            val colRange = slice.y1..slice.y2
+            if (colRange.all { availableMap[prevRow][it] } && maxSliceSize >= (slice.x2 - slice.x1 + 1) * (slice.y2 - slice.y1 + 1) + colRange.count()) {
+                colRange.forEach { availableMap[prevRow][it] = false }
+                slice.x1 -= 1
+                expanded = true
+            }
+        }
+        return expanded
+    }
 
-        // println("\nsol:\n" + availableMap.map { it.map { if (it) 'x' else 'o' }.joinToString("") }.joinToString("\n"))
+    private fun Problem.expandBottom(slice: Slice, availableMap: List<MutableList<Boolean>>): Boolean {
+        var expanded = false
+        val nextRow = slice.x2 + 1
+        if (nextRow < rows) {
+            val colRange = slice.y1..slice.y2
+            if (colRange.all { availableMap[nextRow][it] } && maxSliceSize > (slice.x2 - slice.x1 + 1) * (slice.y2 - slice.y1 + 1) + colRange.count()) {
+                colRange.forEach { availableMap[nextRow][it] = false }
+                slice.x2 += 1
+                expanded = true
+            }
+        }
+        return expanded
+    }
 
+    private fun Problem.expandLeft(slice: Slice, availableMap: List<MutableList<Boolean>>): Boolean {
+        var expanded = false
+        val prevCol = slice.y1 - 1
+        if (prevCol >= 0) {
+            val rowRange = slice.x1..slice.x2
+            if (rowRange.all { availableMap[it][prevCol] } && maxSliceSize > (slice.x2 - slice.x1 + 1) * (slice.y2 - slice.y1 + 1) + rowRange.count()) {
+                rowRange.forEach { availableMap[it][prevCol] = false }
+                slice.y1 -= 1
+                expanded = true
+            }
+        }
+        return expanded
+    }
 
-        // println("Problem: $problem")
+    private fun Problem.expandRight(slice: Slice, availableMap: List<MutableList<Boolean>>): Boolean {
+        var expanded = false
+        val nextCol = slice.y2 + 1
+        if (nextCol < columns) {
+            val rowRange = slice.x1..slice.x2
+            if (rowRange.all { availableMap[it][nextCol] } && maxSliceSize > (slice.x2 - slice.x1 + 1) * (slice.y2 - slice.y1 + 1) + rowRange.count()) {
+                rowRange.forEach { availableMap[it][nextCol] = false }
+                slice.y2 += 1
+                expanded = true
+            }
+        }
+        return expanded
+    }
 
-        // do some stuff
+    private fun Problem.findSlicePair(): List<Pair<Int, Int>> {
+        val minSize = minIng * 2
+        return (1..maxSliceSize).flatMap { row ->
+            (1..maxSliceSize).mapNotNull { col ->
+                val size = row * col
+                if (size in (minSize..maxSliceSize)) {
+                    (row to col)
+                } else null
+            }
+        }.sortedBy { it.first * it.second }
+    }
 
-        val solution = Solution(listOf(
-                Slice(0, 0, 2, 1, 0, 0),
-                Slice(0, 2, 2, 2, 0, 0),
-                Slice(0, 3, 2, 4, 0, 0)
-        ))
-
-        // println("Solution: $solution")
-        // write(outputFile, solution)
+    private fun Problem.filterValidSlice(slicePair: List<Pair<Int, Int>>): List<List<List<Slice>>> {
+        return mashrooms.mapIndexed { x, row ->
+            row.mapIndexed { y, item ->
+                slicePair.mapNotNull { (nRow, nCol) ->
+                    val endX = x + nRow - 1
+                    val endY = y + nCol - 1
+                    if (endX < mashrooms.size && endY < row.size) {
+                        val sliceIngredients = mashrooms.slice(x..endX).flatMap {
+                            it.slice(y..endY)
+                        }
+                        val mashCount = sliceIngredients.count { it }
+                        val tomatoCount = sliceIngredients.size - mashCount
+                        if (mashCount >= minIng && (tomatoCount >= minIng)) {
+                            Slice(x, y, endX, endY, mashCount, tomatoCount)
+                        } else null
+                    } else null
+                }
+            }
+        }
     }
 }
