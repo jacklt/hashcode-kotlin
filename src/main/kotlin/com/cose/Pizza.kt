@@ -1,5 +1,7 @@
 package com.cose
 
+import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.runBlocking
 import java.io.File
 import kotlin.math.ceil
 import kotlin.system.measureTimeMillis
@@ -10,7 +12,7 @@ const val VISUALIZE = false
 fun main(args: Array<String>) {
     measureTimeMillis {
         val fn = listOf("example", "small", "medium", "big")
-        fn.slice(0..0).forEach {
+        fn.slice(0..3).forEach {
             App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out"))
         }
     }.also { println("Completed in ${it}ms") }
@@ -33,7 +35,7 @@ data class Slice(var x1: Int, var y1: Int, var x2: Int, var y2: Int, val mashCou
 data class Solution(val slices: List<Slice>)
 
 object App {
-    fun solveForX(inputFile: File, outputFile: File) {
+    fun solveForX(inputFile: File, outputFile: File) = runBlocking {
         val problem = parse(inputFile)
 
         val slicePair = problem.findSlicePair()
@@ -63,8 +65,8 @@ object App {
 
         val (availableMap, bestSlices) = listOf(validSlice, validSliceX1Y2, validSliceX2Y1, validSliceX2Y2).flatMap { slices ->
             listOf(1.0, 1.1, 2.0).map {
-                problem.solve(slices, it) // .apply { println("$it -> ${first.calcPoints()}") }
-            }
+                async { problem.solve(slices, it) }// .apply { println("$it -> ${first.calcPoints()}") }
+            }.map { it.await() }
         }.maxBy { (availableMap, _) ->
                     availableMap.calcPoints()
                 }!!

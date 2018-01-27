@@ -21,5 +21,6 @@ validSlice count: 4454943
 Solution! slice count: 64109
 Points: 895640 / 1000000 = 89.564%
 
-Completed in 65049ms
+Completed in 41966ms (with coroutine, async/await)
+Completed in 65049ms (single thread)
 ```
