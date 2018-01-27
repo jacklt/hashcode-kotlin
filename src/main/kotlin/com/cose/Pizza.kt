@@ -1,12 +1,16 @@
 package com.cose
 
+import kotlinx.coroutines.experimental.runBlocking
 import java.io.File
 import kotlin.system.measureTimeMillis
+
+const val DEBUG = false
+const val VISUALIZE = false
 
 fun main(args: Array<String>) {
     measureTimeMillis {
         val fn = listOf("example", "small", "medium", "big")
-        fn.forEach {
+        fn.slice(0..3).forEach {
             App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out"))
         }
     }.also { println("Completed in ${it}ms") }
@@ -20,23 +24,23 @@ data class Problem(
         val mashrooms: List<List<Boolean>>
 )
 
-data class Slice(val p1: Pair<Int, Int>, val p2: Pair<Int, Int>)
+data class Slice(var x1: Int, var y1: Int, var x2: Int, var y2: Int)
 data class Solution(val slices: List<Slice>)
 
 object App {
-    fun solveForX(inputFile: File, outputFile: File) {
+    fun solveForX(inputFile: File, outputFile: File) = runBlocking {
         val problem = parse(inputFile)
-        // println("Problem: $problem")
+        if (DEBUG) println("Problem: $problem")
 
         // do some stuff
 
         val solution = Solution(listOf(
-                Slice(0 to 0, 2 to 1),
-                Slice(0 to 2, 2 to 2),
-                Slice(0 to 3, 2 to 4)
+                Slice(0, 0, 2, 1),
+                Slice(0, 2, 2, 2),
+                Slice(0, 3, 2, 4)
         ))
 
-        // println("Solution: $solution")
+        if (DEBUG) println("Solution: $solution")
         // write(outputFile, solution)
     }
 }
