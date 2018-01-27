@@ -10,7 +10,7 @@ const val VISUALIZE = false
 fun main(args: Array<String>) {
     measureTimeMillis {
         val fn = listOf("example", "small", "medium", "big")
-        fn.slice(0..3).forEach {
+        fn.slice(0..0).forEach {
             App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out"))
         }
     }.also { println("Completed in ${it}ms") }
@@ -23,7 +23,7 @@ data class Problem(
         val maxSliceSize: Int,  // H (1 ≤ H ≤ 1000)  is the maximum total number of cells of a slice
         val mashrooms: List<List<Boolean>>
 ) {
-    val ingredients = mashrooms.flatMap { it }
+    val ingredients = mashrooms.flatten()
     val flatSize = ingredients.size
     val mashroomCount = ingredients.count { it }
     val tomatoCount = flatSize - mashroomCount
@@ -42,7 +42,7 @@ object App {
         val validSlice = problem.filterValidSlice(slicePair)
         if (DEBUG) println("validSlice: $validSlice")
 
-        val flatValidSlice = validSlice.flatMap { it }.flatMap { it }
+        val flatValidSlice = validSlice.flatten().flatten()
         println("validSlice count: ${flatValidSlice.size}")
 
         val validSliceX1Y2 = flatValidSlice.groupBy { it.x1 }.map {
