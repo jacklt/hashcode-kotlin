@@ -1,4 +1,4 @@
-package com.cose
+package com.github.jacklt.hashcode
 
 import java.io.File
 
@@ -10,7 +10,6 @@ class Parser(inputFile: File) {
 
     fun next(count: Int) = lines.subList(currentLine + 1, currentLine + 1 + count).apply { currentLine += count }
 }
-
 
 fun parse(inputFile: File) = with(Parser(inputFile)) {
     val (r, c, l, h) = next().split(" ").map { it.toInt() }
