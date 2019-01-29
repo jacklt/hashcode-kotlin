@@ -1,5 +1,10 @@
 package com.github.jacklt.hashcode
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.math.ceil
@@ -8,21 +13,23 @@ import kotlin.system.measureTimeMillis
 const val DEBUG = false
 const val VISUALIZE = false
 
-fun main(false) {
+fun main() {
     measureTimeMillis {
-        val fn = listOf("example", "small", "medium", "big")
-        fn.slice(0..3).forEach {
-            App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out"))
+        runBlocking(Dispatchers.Default) {
+            val fn = listOf("example", "small", "medium", "big")
+            fn.slice(0..3).forEach {
+                App.solveForX(inputFile = File("io/$it.in"), outputFile = File("io/$it.out")).join()
+            }
         }
     }.also { println("Completed in ${it}ms") }
 }
 
 data class Problem(
-        val rows: Int,  // R (1≤R≤1000)  isthenumberofrows,
-        val columns: Int,  // C (1 ≤ C ≤ 1000) is the number of columns,
-        val minIng: Int,  // L (1 ≤ L ≤ 1000)  is the minimum number of each ingredient cells in a slice,
-        val maxSliceSize: Int,  // H (1 ≤ H ≤ 1000)  is the maximum total number of cells of a slice
-        val mashrooms: List<List<Boolean>>
+    val rows: Int,  // R (1≤R≤1000)  isthenumberofrows,
+    val columns: Int,  // C (1 ≤ C ≤ 1000) is the number of columns,
+    val minIng: Int,  // L (1 ≤ L ≤ 1000)  is the minimum number of each ingredient cells in a slice,
+    val maxSliceSize: Int,  // H (1 ≤ H ≤ 1000)  is the maximum total number of cells of a slice
+    val mashrooms: List<List<Boolean>>
 ) {
     val ingredients = mashrooms.flatten()
     val flatSize = ingredients.size
@@ -33,8 +40,11 @@ data class Problem(
 data class Slice(var x1: Int, var y1: Int, var x2: Int, var y2: Int, val mashCount: Int, val tomatoCount: Int)
 data class Solution(val slices: List<Slice>)
 
-object App {
-    fun solveForX(inputFile: File, outputFile: File) = runBlocking {
+object App : CoroutineScope {
+    val job = Job()
+    override val coroutineContext = job
+
+    fun solveForX(inputFile: File, outputFile: File) = launch {
         val problem = parse(inputFile)
 
         val slicePair = problem.findSlicePair()
@@ -67,8 +77,8 @@ object App {
                 async { problem.solve(slices, it) }// .apply { println("$it -> ${first.calcPoints()}") }
             }.map { it.await() }
         }.maxBy { (availableMap, _) ->
-                    availableMap.calcPoints()
-                }!!
+            availableMap.calcPoints()
+        }!!
 
         problem.visualize(bestSlices)
 
@@ -99,17 +109,17 @@ object App {
                         it.slice(slice.y1..slice.y2)
                     }.all { it }
                 }?.also {
-                            // println("$pizzaAvailable $maxSliceLeft ($mashAvailable ${it.mashCount} $maxMash) ($tomatoAvailable $tomatoAvailable $maxTomato)")
-                            (it.x1..it.x2).forEach { x ->
-                                (it.y1..it.y2).forEach { y ->
-                                    availableMap[x][y] = false
-                                }
-                            }
-                            pizzaAvailable -= it.mashCount + it.tomatoCount
-                            mashAvailable -= it.mashCount
-                            tomatoAvailable -= it.tomatoCount
-                            bestSlices.add(it)
+                    // println("$pizzaAvailable $maxSliceLeft ($mashAvailable ${it.mashCount} $maxMash) ($tomatoAvailable $tomatoAvailable $maxTomato)")
+                    (it.x1..it.x2).forEach { x ->
+                        (it.y1..it.y2).forEach { y ->
+                            availableMap[x][y] = false
                         }
+                    }
+                    pizzaAvailable -= it.mashCount + it.tomatoCount
+                    mashAvailable -= it.mashCount
+                    tomatoAvailable -= it.tomatoCount
+                    bestSlices.add(it)
+                }
             }
         }
 

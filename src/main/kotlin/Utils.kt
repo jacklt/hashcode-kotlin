@@ -1,4 +1,4 @@
-package com.cose
+package com.github.jacklt.hashcode
 
 fun Problem.visualize(bestSlices: MutableList<Slice>) {
     if (VISUALIZE) {
