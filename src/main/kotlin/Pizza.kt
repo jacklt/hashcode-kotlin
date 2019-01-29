@@ -1,13 +1,13 @@
-package com.cose
+package com.github.jacklt.hashcode
 
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.system.measureTimeMillis
 
 const val DEBUG = false
 const val VISUALIZE = false
 
-fun main(args: Array<String>) {
+fun main() {
     measureTimeMillis {
         val fn = listOf("example", "small", "medium", "big")
         fn.slice(0..3).forEach {
@@ -35,9 +35,9 @@ object App {
         // do some stuff
 
         val solution = Solution(listOf(
-                Slice(0, 0, 2, 1),
-                Slice(0, 2, 2, 2),
-                Slice(0, 3, 2, 4)
+            Slice(0, 0, 2, 1),
+            Slice(0, 2, 2, 2),
+            Slice(0, 3, 2, 4)
         ))
 
         if (DEBUG) println("Solution: $solution")
